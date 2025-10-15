@@ -210,31 +210,6 @@ public final class Hdf5 {
         return imgPlus;
     }
 
-    private static <T extends NativeType<T>> Img<T> loadImg(IHDF5Reader reader, String path, DatasetType type, HDF5DataSetInformation info, List<AxisType> axes, LongConsumer callback) {
-        long[] dims = reversed(info.getDimensions());
-        if (!(2 <= dims.length && dims.length <= 5)) {
-            throw new IllegalArgumentException(dims.length + "D datasets are not supported");
-        }
-        if (axes != null && axes.size() != dims.length) {
-            throw new IllegalArgumentException("Requested axes don't match dataset dimensions");
-        }
-
-        int[] blockDims = inputBlockDims(dims,
-                info.tryGetChunkSizes() != null ? reversed(info.tryGetChunkSizes()) : null);
-
-        Img<T> img;
-        try (HDF5DataSet dataset = reader.object().openDataSet(path)) {
-            callback.accept(0L);
-            if (IntStream.range(0, dims.length).allMatch(i -> dims[i] == blockDims[i])) {
-                img = readArrayImg(type, reader, dataset, dims);
-                callback.accept(Arrays.stream(dims).reduce(type.size, (l, r) -> l * r));
-            } else {
-                img = readCellImg(type, reader, dataset, dims, blockDims, callback);
-            }
-        }
-        return img;
-    }
-
     /**
      * {@link #writeDataset} without compression, axis reordering and callback.
      */
@@ -352,6 +327,31 @@ public final class Hdf5 {
                 callback.accept(bytes);
             }
         }
+    }
+
+    private static <T extends NativeType<T>> Img<T> loadImg(IHDF5Reader reader, String path, DatasetType type, HDF5DataSetInformation info, List<AxisType> axes, LongConsumer callback) {
+        long[] dims = reversed(info.getDimensions());
+        if (!(2 <= dims.length && dims.length <= 5)) {
+            throw new IllegalArgumentException(dims.length + "D datasets are not supported");
+        }
+        if (axes != null && axes.size() != dims.length) {
+            throw new IllegalArgumentException("Requested axes don't match dataset dimensions");
+        }
+
+        int[] blockDims = inputBlockDims(dims,
+                info.tryGetChunkSizes() != null ? reversed(info.tryGetChunkSizes()) : null);
+
+        Img<T> img;
+        try (HDF5DataSet dataset = reader.object().openDataSet(path)) {
+            callback.accept(0L);
+            if (IntStream.range(0, dims.length).allMatch(i -> dims[i] == blockDims[i])) {
+                img = readArrayImg(type, reader, dataset, dims);
+                callback.accept(Arrays.stream(dims).reduce(type.size, (l, r) -> l * r));
+            } else {
+                img = readCellImg(type, reader, dataset, dims, blockDims, callback);
+            }
+        }
+        return img;
     }
 
     private static <T extends NativeType<T>, A extends ArrayDataAccess<A>>
